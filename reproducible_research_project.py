@@ -142,3 +142,14 @@ for i,v in enumerate(importance):
 # plot feature importance
 pyplot.bar([x for x in range(len(importance))], importance)
 pyplot.show()
+		       
+# Synthetic Minority Oversampling Technique (SMOTE)
+# SMOTE is used to remove the imbalance in the training data by creating samples using the current data. 
+# It doesn't create any duplication. After perform this action, we have a balance training data.
+
+from imblearn.over_sampling import SMOTE
+
+smt = SMOTE()
+
+x_train, y_train = smt.fit_sample(x_train, y_train)
+np.bincount(y_train)		      
