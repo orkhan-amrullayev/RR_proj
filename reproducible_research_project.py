@@ -110,8 +110,6 @@ np.random.seed(1000)
 df_feat = new_df[new_df.columns[0:-1]] # Feature columns 
 df_head = new_df[new_df.columns[len(new_df.columns)-1]]  # Target variable
 
-
-
 """## Data Normalization"""
 
 # Feature Scalling using Sklearn StandardScaler function
@@ -123,9 +121,6 @@ df_scaled = pd.DataFrame(scaled_features,columns=df_feat.columns)
 df_scaled.head()
 
 df_scaled.dtypes
-
-
-
 
 
 """## Feature Importance Analysis"""
@@ -142,3 +137,15 @@ for i,v in enumerate(importance):
 # plot feature importance
 pyplot.bar([x for x in range(len(importance))], importance)
 pyplot.show()
+
+		       
+# Synthetic Minority Oversampling Technique (SMOTE)
+# SMOTE is used to remove the imbalance in the training data by creating samples using the current data. 
+# It doesn't create any duplication. After perform this action, we have a balance training data.
+
+from imblearn.over_sampling import SMOTE
+
+smt = SMOTE()
+
+x_train, y_train = smt.fit_sample(x_train, y_train)
+np.bincount(y_train)
