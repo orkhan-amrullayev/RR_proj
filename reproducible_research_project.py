@@ -71,56 +71,101 @@ plt.show()
 
 """
 
-df['Churn Value'].value_counts()
+df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
+df['TotalCharges'] = df['TotalCharges'].fillna(value=0)
+df['tenure'] = df['tenure'].astype('float64')
 
-df[df['Churn Value'] == 0.0].sample(1869)
-
-
-
-
-
-"""<h3>Correlation matrix</h3>"""
-
-fig, ax = plt.subplots(figsize=(20,20)
-sns.heatmap(df.corr(), annot=True, linewidths=.5, ax=ax)
-
-"""Outcome of Correlation Matrix
-
-# Check the Data set is balanced or not based on target values in classification
-"""
+df.drop('customerID', axis=1, inplace=True)
 
 
+col_cat = df.select_dtypes(include='object').drop('Churn', axis=1).columns.tolist()
+col_num = df.select_dtypes(exclude='object').columns.tolist()
+
+
+# """<h3>Correlation matrix</h3>"""
+
+# fig, ax = plt.subplots(figsize=(20,20)
+# sns.heatmap(df.corr(), annot=True, linewidths=.5, ax=ax)
+
+# """Outcome of Correlation Matrix
+
+# # Check the Data set is balanced or not based on target values in classification
+# """
+
+for c in col_cat:
+    print('Column {} unique values: {}'.format(c, len(df[c].unique())))
 
 
 
 """**Integer encoding**"""
 
-#Identify the categorical columns in the dataset
-obj_df = df.select_dtypes(include=['object']).copy()
-obj_df.head()
+# #Identify the categorical columns in the dataset
+# obj_df = df.select_dtypes(include=['object']).copy()
+# obj_df.head()
 
-#Encoding the categorical values ( Integer encoding )
-new_df = df.apply(LabelEncoder().fit_transform)
-new_df.head()
+# #Encoding the categorical values ( Integer encoding )
+# new_df = df.apply(LabelEncoder().fit_transform)
+# new_df.head()
 
 #Randomization of the dataset
-np.random.seed(1000)
+# np.random.seed(1000)
 
-# Seperating the Features and Target Columns 
-df_feat = new_df[new_df.columns[0:-1]] # Feature columns 
-df_head = new_df[new_df.columns[len(new_df.columns)-1]]  # Target variable
+# # Seperating the Features and Target Columns 
+# df_feat = new_df[new_df.columns[0:-1]] # Feature columns 
+# df_head = new_df[new_df.columns[len(new_df.columns)-1]]  # Target variable
+
+plt.figure(figsize=(20,20))
+for i,c in enumerate(col_cat):
+    plt.subplot(5,4,i+1)
+    sns.countplot(df[c], hue=df['Churn'])
+    plt.title(c)
+    plt.xlabel('')
+
+	
+plt.figure(figsize=(20,5))
+for i,c in enumerate(['tenure', 'MonthlyCharges', 'TotalCharges']):
+    plt.subplot(1,3,i+1)
+    sns.distplot(df[df['Churn'] == 'No'][c], kde=True, color='blue', hist=False, kde_kws=dict(linewidth=2), label='No')
+    sns.distplot(df[df['Churn'] == 'Yes'][c], kde=True, color='Orange', hist=False, kde_kws=dict(linewidth=2), label='Yes')
+    plt.title(c)
+	
+plt.figure(figsize=(20,5))
+for i,c in enumerate(col_num):
+    plt.subplot(1,4,i+1)
+    sns.violinplot(x=df['Churn'], y=df[c])
+    plt.title(c)
+
+################################
+dfT = pd.get_dummies(df, columns=col_cat)
+dfT['Churn'] = dfT['Churn'].map(lambda x: 1 if x == 'Yes' else 0)
+
+minority = dfT[dfT.Churn==1]
+majority = dfT[dfT.Churn==0]
+
+minority_upsample = resample(minority, replace=True, n_samples=majority.shape[0])
+dfT = pd.concat([minority_upsample, majority], axis=0)
+dfT = dfT.sample(frac=1).reset_index(drop=True)
+
+
+
+
 
 """## Data Normalization"""
 
-# Feature Scalling using Sklearn StandardScaler function
-scaler = StandardScaler()
-StandardScaler(copy=True,with_mean=True,with_std=True)
-scaler.fit(df_feat)
-scaled_features = scaler.transform(df_feat)
-df_scaled = pd.DataFrame(scaled_features,columns=df_feat.columns)
-df_scaled.head()
+rs = RobustScaler()
+dfT['tenure'] = rs.fit_transform(dfT['tenure'].values.reshape(-1,1))
+dfT['MonthlyCharges'] = rs.fit_transform(dfT['MonthlyCharges'].values.reshape(-1,1))
+dfT['TotalCharges'] = rs.fit_transform(dfT['TotalCharges'].values.reshape(-1,1))
 
-df_scaled.dtypes
+# Feature Scalling using Sklearn StandardScaler function
+# scaler = StandardScaler()
+# StandardScaler(copy=True,with_mean=True,with_std=True)
+# scaler.fit(df_feat)
+# scaled_features = scaler.transform(df_feat)
+# df_scaled = pd.DataFrame(scaled_features,columns=df_feat.columns)
+# df_scaled.head()
+
+# df_scaled.dtypes
 
 
 """## Feature Importance Analysis"""
@@ -138,14 +183,90 @@ for i,v in enumerate(importance):
 pyplot.bar([x for x in range(len(importance))], importance)
 pyplot.show()
 
-		       
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+
+
+
+model_lg = LogisticRegression(max_iter=500,random_state=0, n_jobs=-1)
+model_lg.fit(X_train, y_train)
+
+# Making Predictions
+pred_lg = model_lg.predict(X_test)
+
+
+
+from sklearn.tree import DecisionTreeClassifier
+# Creating object of the model
+model_dt = DecisionTreeClassifier(max_depth=4, random_state=42)
+model_dt.fit(X_train, y_train)
+pred_dt = model_dt.predict(X_test)
+
+
+
+from sklearn.ensemble import RandomForestClassifier
+model_rf = RandomForestClassifier(n_estimators=400,min_samples_leaf=0.13, random_state=42)
+model_rf.fit(X_train, y_train)
+pred_rf = model_rf.predict(X_test)
+
+
+xg = XGBClassifier()
+xg.fit(X_train, y_train)
+y_test_hat_xg = xg.predict(X_test)
+
+
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Flatten
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+
+
+model = Sequential()
+
+model.add(Dense(1024, activation='relu'))
+model.add(Dropout(0.1))
+
+model.add(Dense(1024, activation='relu'))
+model.add(Dropout(0.1))
+
+model.add(Dense(1024, activation='relu'))
+model.add(Dropout(0.1))
+
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.2))
+
+model.add(Dense(256, activation='relu'))
+model.add(Dropout(0.25))
+
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.45))
+
+model.add(Dense(1, activation='sigmoid'))
+
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.3, verbose=1,patience=10, min_lr=0.0000000001)
+early_stopping_cb = EarlyStopping(patience=10, restore_best_weights=True)
+
+model.compile(optimizer='Adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+history = model.fit(x=X_train, y=y_train, batch_size=128, epochs=100, validation_data=(X_test, y_test), callbacks=[early_stopping_cb, reduce_lr])
+
+
+y_test_hat_tf = model.predict(X_test)
+y_test_hat_tf2 = [1 if x > 0.5 else 0 for x in y_test_hat_tf ]
+
+# print(classification_report(y_test, y_test_hat_tf2))
+
+
+
+
 # Synthetic Minority Oversampling Technique (SMOTE)
 # SMOTE is used to remove the imbalance in the training data by creating samples using the current data. 
 # It doesn't create any duplication. After perform this action, we have a balance training data.
 
-from imblearn.over_sampling import SMOTE
+# from imblearn.over_sampling import SMOTE
 
-smt = SMOTE()
+# smt = SMOTE()
 
-x_train, y_train = smt.fit_sample(x_train, y_train)
-np.bincount(y_train)
+# x_train, y_train = smt.fit_sample(x_train, y_train)
+# np.bincount(y_train)
